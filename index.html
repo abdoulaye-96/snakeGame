@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu de Serpent</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #333;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            background-color: #000;
+            border: 2px solid #fff;
+        }
+        #info {
+            display: flex;
+            justify-content: space-between;
+            width: 400px;
+            margin-bottom: 10px;
+        }
+        #score, #level {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <div id="score">Score: 0</div>
+        <div id="level">Niveau: 1</div>
+    </div>
+    <canvas id="snakeGame" width="400" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('snakeGame');
+        const ctx = canvas.getContext('2d');
+
+        const boxSize = 20;
+        let snake = [
+            { x: 5 * boxSize, y: 5 * boxSize },
+            { x: 4 * boxSize, y: 5 * boxSize },
+            { x: 3 * boxSize, y: 5 * boxSize }
+        ];
+        let direction = "RIGHT";
+        let gameRunning = true;
+        let apple = generateApple();
+        let score = 0;
+        let level = 1;
+        let speed = 200;
+        let gameInterval;
+
+        // Déclarez des sons
+        const eatSound = new Audio('eat.mp3');
+        const crashSound = new Audio('crash.mp3');
+
+        // Liste des obstacles
+        let obstacles = generateObstacles(level);
+
+        document.addEventListener("keydown", changeDirection);
+
+        function changeDirection(event) {
+            if (event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+            else if (event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+            else if (event.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+            else if (event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+        }
+
+        function drawSnake() {
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = index === 0 ? 'lime' : 'green';
+                ctx.fillRect(segment.x, segment.y, boxSize, boxSize);
+                ctx.strokeStyle = '#000';
+                ctx.strokeRect(segment.x, segment.y, boxSize, boxSize);
+            });
+        }
+
+        function drawApple() {
+            ctx.fillStyle = "red";
+            ctx.fillRect(apple.x, apple.y, boxSize, boxSize);
+        }
+
+        // Dessiner les obstacles
+        function drawObstacles() {
+            ctx.fillStyle = "gray";
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, boxSize, boxSize);
+            });
+        }
+
+        function generateApple() {
+            return {
+                x: Math.floor(Math.random() * (canvas.width / boxSize)) * boxSize,
+                y: Math.floor(Math.random() * (canvas.height / boxSize)) * boxSize
+            };
+        }
+
+        // Générer des obstacles en fonction du niveau
+        function generateObstacles(level) {
+            const obstacleCount = level * 3; // Augmente avec le niveau
+            let newObstacles = [];
+            for (let i = 0; i < obstacleCount; i++) {
+                newObstacles.push({
+                    x: Math.floor(Math.random() * (canvas.width / boxSize)) * boxSize,
+                    y: Math.floor(Math.random() * (canvas.height / boxSize)) * boxSize
+                });
+            }
+            return newObstacles;
+        }
+
+        function checkAppleCollision() {
+            const head = snake[0];
+            // Jouez le son lorsqu'une pomme est mangée
+            if (head.x === apple.x && head.y === apple.y) {
+                eatSound.play();
+                score += 10;
+                updateScore();
+
+                if (score % 50 === 0) {
+                    increaseLevel();
+                }
+
+                apple = generateApple();
+                snake.push({});
+            }
+        }
+
+        function updateScore() {
+            const scoreDisplay = document.getElementById('score');
+            scoreDisplay.textContent = `Score: ${score}`;
+        }
+
+        function increaseLevel() {
+            level += 1;
+            updateLevel();
+            increaseSpeed();
+            obstacles = generateObstacles(level); // Ajouter plus d'obstacles
+        }
+
+        function updateLevel() {
+            const levelDisplay = document.getElementById('level');
+            levelDisplay.textContent = `Niveau: ${level}`;
+        }
+
+        function increaseSpeed() {
+            clearInterval(gameInterval);
+            speed = Math.max(50, speed - 20);
+            gameInterval = setInterval(gameLoop, speed);
+        }
+
+        function checkCollision() {
+            const head = snake[0];
+
+            if (
+                head.x < 0 || head.x >= canvas.width || 
+                head.y < 0 || head.y >= canvas.height
+            ) {
+                return true;
+            }
+
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    return true;
+                }
+            }
+
+            // Vérifie si la tête touche un obstacle
+            for (let obstacle of obstacles) {
+                if (head.x === obstacle.x && head.y === obstacle.y) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function updateSnake() {
+            let head = { ...snake[0] };
+
+            if (direction === "UP") head.y -= boxSize;
+            else if (direction === "DOWN") head.y += boxSize;
+            else if (direction === "LEFT") head.x -= boxSize;
+            else if (direction === "RIGHT") head.x += boxSize;
+
+            snake.unshift(head);
+            checkAppleCollision();
+            snake.pop();
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateSnake();
+
+            // Jouez le son lors d'une collision
+            if (checkCollision()) {
+                crashSound.play();
+                gameRunning = false;
+                alert(`Game Over ! Votre score est : ${score}, Niveau atteint : ${level}`);
+                return;
+            }
+
+            drawApple();
+            drawSnake();
+            drawObstacles();
+        }
+
+        function startGame() {
+            gameInterval = setInterval(gameLoop, speed);
+        }
+
+        startGame();
+    </script>
+</body>
+</html>
